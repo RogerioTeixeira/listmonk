@@ -1,21 +1,5 @@
 env:
-  - GO111MODULE=on
-  - CGO_ENABLED=0
   - GITHUB_ORG=rogerioteixeira
-
-builds:
-  - binary: listmonk
-    main: ./cmd
-    goos:
-      - linux
-    goarch:
-      - amd64
-    ldflags:
-      - -s -w -X "main.buildString={{ .Tag }} ({{ .ShortCommit }} {{ .Date }}, {{ .Os }}/{{ .Arch }})" -X "main.versionString={{ .Tag }}"
-    hooks:
-      post: make pack-bin BIN={{ .Path }}
-
-archives:
 
 dockers:
   - use: buildx
@@ -32,9 +16,6 @@ dockers:
       - --label=org.opencontainers.image.version={{ .Version }}
       - --label=org.opencontainers.image.source=https://github.com/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}
     dockerfile: Dockerfile
-    extra_files:
-      - config.toml.sample
-      - docker-entrypoint.sh
 
 docker_manifests:
   - name_template: ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:latest
