@@ -34,9 +34,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare frontend / assets
-        run: make dist
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:

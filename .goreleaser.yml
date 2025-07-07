@@ -1,11 +1,7 @@
 env:
   - GO111MODULE=on
   - CGO_ENABLED=0
-  - GITHUB_ORG=RogerioTeixeira
-
-before:
-  hooks:
-    - make build-frontend
+  - GITHUB_ORG=rogerioteixeira
 
 builds:
   - binary: listmonk
