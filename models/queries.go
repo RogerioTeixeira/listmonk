@@ -36,6 +36,7 @@ type Queries struct {
 	DeleteOrphanSubscribers         *sqlx.Stmt `query:"delete-orphan-subscribers"`
 	UnsubscribeByCampaign           *sqlx.Stmt `query:"unsubscribe-by-campaign"`
 	ExportSubscriberData            *sqlx.Stmt `query:"export-subscriber-data"`
+	GetSubscriberActivity           *sqlx.Stmt `query:"get-subscriber-activity"`
 
 	// Non-prepared arbitrary subscriber queries.
 	QuerySubscribers                       string     `query:"query-subscribers"`
@@ -106,16 +107,18 @@ type Queries struct {
 	UpdateSettings *sqlx.Stmt `query:"update-settings"`
 
 	// GetStats *sqlx.Stmt `query:"get-stats"`
-	RecordBounce              *sqlx.Stmt `query:"record-bounce"`
-	QueryBounces              string     `query:"query-bounces"`
-	DeleteBounces             *sqlx.Stmt `query:"delete-bounces"`
-	DeleteBouncesBySubscriber *sqlx.Stmt `query:"delete-bounces-by-subscriber"`
-	GetDBInfo                 string     `query:"get-db-info"`
+	RecordBounce                *sqlx.Stmt `query:"record-bounce"`
+	QueryBounces                string     `query:"query-bounces"`
+	BlocklistBouncedSubscribers *sqlx.Stmt `query:"blocklist-bounced-subscribers"`
+	DeleteBounces               *sqlx.Stmt `query:"delete-bounces"`
+	DeleteBouncesBySubscriber   *sqlx.Stmt `query:"delete-bounces-by-subscriber"`
+	GetDBInfo                   string     `query:"get-db-info"`
 
 	CreateUser        *sqlx.Stmt `query:"create-user"`
 	UpdateUser        *sqlx.Stmt `query:"update-user"`
 	UpdateUserProfile *sqlx.Stmt `query:"update-user-profile"`
 	UpdateUserLogin   *sqlx.Stmt `query:"update-user-login"`
+	SetUserTwoFA      *sqlx.Stmt `query:"set-user-twofa"`
 	DeleteUsers       *sqlx.Stmt `query:"delete-users"`
 	GetUsers          *sqlx.Stmt `query:"get-users"`
 	GetUser           *sqlx.Stmt `query:"get-user"`

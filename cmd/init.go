@@ -54,8 +54,10 @@ import (
 )
 
 const (
-	queryFilePath = "queries.sql"
-	emailMsgr     = "email"
+	// Path to the SQL queries directory in the embedded FS.
+	queryFilePath = "/queries"
+
+	emailMsgr = "email"
 )
 
 // UrlConfig contains various URL constants used in the app.
@@ -96,16 +98,29 @@ type Config struct {
 	} `koanf:"privacy"`
 	Security struct {
 		OIDC struct {
-			Enabled      bool   `koanf:"enabled"`
-			ProviderURL  string `koanf:"provider_url"`
-			ProviderName string `koanf:"provider_name"`
-			ClientID     string `koanf:"client_id"`
-			ClientSecret string `koanf:"client_secret"`
+			Enabled           bool   `koanf:"enabled"`
+			ProviderURL       string `koanf:"provider_url"`
+			ProviderName      string `koanf:"provider_name"`
+			ClientID          string `koanf:"client_id"`
+			ClientSecret      string `koanf:"client_secret"`
+			AutoCreateUsers   bool   `koanf:"auto_create_users"`
+			DefaultUserRoleID int    `koanf:"default_user_role_id"`
+			DefaultListRoleID int    `koanf:"default_list_role_id"`
 		} `koanf:"oidc"`
 
-		EnableCaptcha bool   `koanf:"enable_captcha"`
-		CaptchaKey    string `koanf:"captcha_key"`
-		CaptchaSecret string `koanf:"captcha_secret"`
+		Captcha struct {
+			Altcha struct {
+				Enabled    bool `koanf:"enabled"`
+				Complexity int  `koanf:"complexity"`
+			} `koanf:"altcha"`
+			HCaptcha struct {
+				Enabled bool   `koanf:"enabled"`
+				Key     string `koanf:"key"`
+				Secret  string `koanf:"secret"`
+			} `koanf:"hcaptcha"`
+		} `koanf:"captcha"`
+
+		CorsOrigins []string `koanf:"cors_origins"`
 	} `koanf:"security"`
 
 	Appearance struct {
@@ -186,7 +201,7 @@ func initFS(appDir, frontendDir, staticDir, i18nDir string) stuffbin.FileSystem 
 		// These paths are joined with appDir.
 		appFiles = []string{
 			"./config.toml.sample:config.toml.sample",
-			"./queries.sql:queries.sql",
+			"./queries:queries",
 			"./schema.sql:schema.sql",
 			"./permissions.json:permissions.json",
 		}
@@ -320,19 +335,35 @@ func initDB() *sqlx.DB {
 	return db.Unsafe()
 }
 
-// readQueries reads named SQL queries from the SQL queries file into a query map.
-func readQueries(sqlFile string, fs stuffbin.FileSystem) goyesql.Queries {
-	// Load SQL queries.
-	qB, err := fs.Read(sqlFile)
+func readQueries(dir string, fs stuffbin.FileSystem) goyesql.Queries {
+	out := goyesql.Queries{}
+
+	// Glob all the .sql files in the queries directory.
+	qPath := path.Join(dir, "/*.sql")
+	files, err := fs.Glob(qPath)
 	if err != nil {
-		lo.Fatalf("error reading SQL file %s: %v", sqlFile, err)
-	}
-	qMap, err := goyesql.ParseBytes(qB)
-	if err != nil {
-		lo.Fatalf("error parsing SQL queries: %v", err)
+		lo.Fatalf("error reading *.sql query files from %s: %v", qPath, err)
 	}
 
-	return qMap
+	// Read and merge queries from all files into one map.
+	for _, file := range files {
+		// Read the SQL file.
+		b, err := fs.Read(file)
+		if err != nil {
+			lo.Fatalf("error reading SQL file %s: %v", file, err)
+		}
+
+		// Parse queries in it into a map.
+		mp, err := goyesql.ParseBytes(b)
+		if err != nil {
+			lo.Fatalf("error parsing SQL queries: %v", err)
+		}
+
+		// Merge into the main query map.
+		maps.Copy(out, mp)
+	}
+
+	return out
 }
 
 // prepareQueries queries prepares a query map and returns a *Queries
@@ -902,9 +933,12 @@ func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.Fi
 
 // initCaptcha initializes the captcha service.
 func initCaptcha() *captcha.Captcha {
-	return captcha.New(captcha.Opt{
-		CaptchaSecret: ko.String("security.captcha_secret"),
-	})
+	var opt captcha.Opt
+	if err := ko.Unmarshal("security.captcha", &opt); err != nil {
+		lo.Fatalf("error loading captcha config: %v", err)
+	}
+
+	return captcha.New(opt)
 }
 
 // initCron initializes the cron job for refreshing slow query cache.
@@ -991,6 +1025,7 @@ func initTplFuncs(i *i18n.I18n, u *UrlConfig) template.FuncMap {
 	sprigFuncs := sprig.GenericFuncMap()
 	delete(sprigFuncs, "env")
 	delete(sprigFuncs, "expandenv")
+	delete(sprigFuncs, "getHostByName")
 
 	maps.Copy(funcs, sprigFuncs)
 
@@ -1004,11 +1039,14 @@ func initAuth(co *core.Core, db *sql.DB, ko *koanf.Koanf) (bool, *auth.Auth) {
 	// If OIDC is enabled, set up the OIDC config.
 	if ko.Bool("security.oidc.enabled") {
 		oidcCfg = auth.OIDCConfig{
-			Enabled:      true,
-			ProviderURL:  ko.String("security.oidc.provider_url"),
-			ClientID:     ko.String("security.oidc.client_id"),
-			ClientSecret: ko.String("security.oidc.client_secret"),
-			RedirectURL:  fmt.Sprintf("%s/auth/oidc", strings.TrimRight(ko.String("app.root_url"), "/")),
+			Enabled:           true,
+			ProviderURL:       ko.String("security.oidc.provider_url"),
+			ClientID:          ko.String("security.oidc.client_id"),
+			ClientSecret:      ko.String("security.oidc.client_secret"),
+			AutoCreateUsers:   ko.Bool("security.oidc.auto_create_users"),
+			DefaultUserRoleID: ko.Int("security.oidc.default_user_role_id"),
+			DefaultListRoleID: ko.Int("security.oidc.default_list_role_id"),
+			RedirectURL:       fmt.Sprintf("%s/auth/oidc", strings.TrimRight(ko.String("app.root_url"), "/")),
 		}
 	}
 
@@ -1021,6 +1059,7 @@ func initAuth(co *core.Core, db *sql.DB, ko *koanf.Koanf) (bool, *auth.Auth) {
 		},
 		SetCookie: func(cookie *http.Cookie, w any) error {
 			c := w.(echo.Context)
+			cookie.SameSite = http.SameSiteLaxMode
 			c.SetCookie(cookie)
 			return nil
 		},

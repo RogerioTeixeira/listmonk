@@ -10,6 +10,7 @@ DROP TYPE IF EXISTS template_type CASCADE; CREATE TYPE template_type AS ENUM ('c
 DROP TYPE IF EXISTS user_type CASCADE; CREATE TYPE user_type AS ENUM ('user', 'api');
 DROP TYPE IF EXISTS user_status CASCADE; CREATE TYPE user_status AS ENUM ('enabled', 'disabled');
 DROP TYPE IF EXISTS role_type CASCADE; CREATE TYPE role_type AS ENUM ('user', 'list');
+DROP TYPE IF EXISTS twofa_type CASCADE; CREATE TYPE twofa_type AS ENUM ('none', 'totp');
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -253,10 +254,9 @@ INSERT INTO settings (key, value) VALUES
     ('privacy.domain_blocklist', '[]'),
     ('privacy.domain_allowlist', '[]'),
     ('privacy.record_optin_ip', 'false'),
-    ('security.enable_captcha', 'false'),
-    ('security.captcha_key', '""'),
-    ('security.captcha_secret', '""'),
-    ('security.oidc', '{"enabled": false, "provider_url": "", "provider_name": "", "client_id": "", "client_secret": ""}'),
+    ('security.captcha', '{"altcha": {"enabled": false, "complexity": 300000}, "hcaptcha": {"enabled": false, "key": "", "secret": ""}}'),
+    ('security.oidc', '{"enabled": false, "provider_url": "", "provider_name": "", "client_id": "", "client_secret": "", "auto_create_users": false, "default_user_role_id": null, "default_list_role_id": null}'),
+    ('security.cors_origins', '[]'),
     ('upload.provider', '"filesystem"'),
     ('upload.max_file_size', '5000'),
     ('upload.extensions', '["jpg","jpeg","png","gif","svg","*"]'),
@@ -336,6 +336,8 @@ CREATE TABLE users (
     user_role_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
     list_role_id     INTEGER NULL REFERENCES roles(id) ON DELETE CASCADE,
     status           user_status NOT NULL DEFAULT 'disabled',
+    twofa_type       twofa_type NOT NULL DEFAULT 'none',
+    twofa_key        TEXT NULL,
     loggedin_at      TIMESTAMP WITH TIME ZONE NULL,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()

@@ -169,6 +169,11 @@ export const getSubscriber = async (id) => http.get(
   { loading: models.subscribers },
 );
 
+export const getSubscriberActivity = async (id) => http.get(
+  `/api/subscribers/${id}/activity`,
+  { loading: models.subscribers },
+);
+
 export const getSubscriberBounces = async (id) => http.get(
   `/api/subscribers/${id}/bounces`,
   { loading: models.bounces },
@@ -187,6 +192,11 @@ export const deleteBounce = async (id) => http.delete(
 export const deleteBounces = async (params) => http.delete(
   '/api/bounces',
   { params, loading: models.bounces },
+);
+
+export const blocklistBouncedSubscribers = async () => http.put(
+  '/api/bounces/blocklist',
+  { loading: models.bounces },
 );
 
 export const createSubscriber = (data) => http.post(
@@ -531,4 +541,20 @@ export const updateListRole = (data) => http.put(
 export const deleteRole = (id) => http.delete(
   `/api/roles/${id}`,
   { loading: models.userRoles },
+);
+
+// TOTP 2FA APIs
+export const getTOTPQR = (id) => http.get(
+  `/api/users/${id}/twofa/totp`,
+  { camelCase: true },
+);
+
+export const enableTOTP = (id, data) => http.put(
+  `/api/users/${id}/twofa`,
+  data,
+);
+
+export const disableTOTP = (id, data) => http.delete(
+  `/api/users/${id}/twofa`,
+  { data },
 );

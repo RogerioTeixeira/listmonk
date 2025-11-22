@@ -40,6 +40,14 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		e.DefaultHTTPErrorHandler(err, c)
 	}
 
+	// Configure CORS middleware if domains are configured.
+	if len(a.cfg.Security.CorsOrigins) > 0 {
+		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+			AllowOrigins: a.cfg.Security.CorsOrigins,
+			AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+		}))
+	}
+
 	// =================================================================
 	// Authenticated non /api handlers.
 	{
@@ -107,6 +115,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		g.GET("/api/subscribers", pm(a.QuerySubscribers, "subscribers:get_all", "subscribers:get"))
 		g.GET("/api/subscribers/:id", pm(hasID(a.GetSubscriber), "subscribers:get_all", "subscribers:get"))
+		g.GET("/api/subscribers/:id/activity", pm(hasID(a.GetSubscriberActivity), "subscribers:get_all", "subscribers:get"))
 		g.GET("/api/subscribers/:id/export", pm(hasID(a.ExportSubscriberData), "subscribers:get_all", "subscribers:get"))
 		g.GET("/api/subscribers/:id/bounces", pm(hasID(a.GetSubscriberBounces), "bounces:get"))
 		g.DELETE("/api/subscribers/:id/bounces", pm(hasID(a.DeleteSubscriberBounces), "bounces:manage"))
@@ -121,6 +130,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.DELETE("/api/subscribers", pm(a.DeleteSubscribers, "subscribers:manage"))
 
 		g.GET("/api/bounces", pm(a.GetBounces, "bounces:get"))
+		g.PUT("/api/bounces/blocklist", pm(a.BlocklistBouncedSubscribers, "bounces:manage"))
 		g.GET("/api/bounces/:id", pm(hasID(a.GetBounce), "bounces:get"))
 		g.DELETE("/api/bounces", pm(a.DeleteBounces, "bounces:manage"))
 		g.DELETE("/api/bounces/:id", pm(hasID(a.DeleteBounce), "bounces:manage"))
@@ -191,6 +201,11 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.DELETE("/api/users/:id", pm(hasID(a.DeleteUser), "users:manage"))
 		g.POST("/api/logout", a.Logout)
 
+		// TOTP 2FA endpoints
+		g.GET("/api/users/:id/twofa/totp", hasID(a.GenerateTOTPQR))
+		g.PUT("/api/users/:id/twofa", hasID(a.EnableTOTP))
+		g.DELETE("/api/users/:id/twofa", hasID(a.DisableTOTP))
+
 		g.GET("/api/roles/users", pm(a.GetUserRoles, "roles:get"))
 		g.GET("/api/roles/lists", pm(a.GeListRoles, "roles:get"))
 		g.POST("/api/roles/users", pm(a.CreateUserRole, "roles:manage"))
@@ -221,9 +236,15 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 			return c.Render(http.StatusOK, "home", publicTpl{Title: "listmonk"})
 		})
 
-		// Public admin endpoints (login page, OIDC endpoints).
+		// Public admin endpoints (login page, OIDC endpoints, password reset).
 		g.GET(path.Join(uriAdmin, "/login"), a.LoginPage)
 		g.POST(path.Join(uriAdmin, "/login"), a.LoginPage)
+		g.GET(path.Join(uriAdmin, "/login/twofa"), a.TwofaPage)
+		g.POST(path.Join(uriAdmin, "/login/twofa"), a.TwofaPage)
+		g.GET(path.Join(uriAdmin, "/forgot"), a.ForgotPage)
+		g.POST(path.Join(uriAdmin, "/forgot"), a.ForgotPage)
+		g.GET(path.Join(uriAdmin, "/reset"), a.ResetPage)
+		g.POST(path.Join(uriAdmin, "/reset"), a.ResetPage)
 
 		if a.cfg.Security.OIDC.Enabled {
 			g.POST("/auth/oidc", a.OIDCLogin)
@@ -233,6 +254,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		// Public APIs.
 		g.GET("/api/public/lists", a.GetPublicLists)
 		g.POST("/api/public/subscription", a.PublicSubscription)
+		g.GET("/api/public/captcha/altcha", a.AltchaChallenge)
 		if a.cfg.EnablePublicArchive {
 			g.GET("/api/public/archive", a.GetCampaignArchives)
 		}
